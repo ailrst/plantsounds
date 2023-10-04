@@ -23,16 +23,26 @@
 
 #include <FastLED.h>
 
+#include "model.hpp"
+
+
 #define LED_PIN 5
-#define NUM_LEDS 50
+#define NUM_LEDS 50 // TODO: this is a complete guess
 #define BRIGHTNESS 64
 #define LED_TYPE WS2812
 #define COLOR_ORDER GRB
 CRGB leds[NUM_LEDS];
 
+// MsgPacketizer
 #define MAX_CHANNELS 100
 
 #define UPDATES_PER_SECOND 100
+// ---------------
+
+#define NUM_TOUCH_PINS 8
+
+char touch_state[NUM_TOUCH_PINS] = {}; // TODO: 7/8ths wasted space
+
 
 CRGBPalette16 currentPalette;
 CRGBPalette16 blackPalette;
@@ -45,14 +55,6 @@ extern const TProgmemPalette16 myRedWhiteBluePalette_p PROGMEM;
 // Reset Pin is used for I2C or SPI
 #define CAP1188_RESET 9
 
-// CS pin is used for software or hardware SPI
-#define CAP1188_CS 10
-
-// These are defined for software SPI, for hardware SPI, check your
-// board's SPI pins in the Arduino documentation
-#define CAP1188_MOSI 11
-#define CAP1188_MISO 12
-#define CAP1188_CLK 13
 
 // For I2C, connect SDA to your Arduino's SDA pin, SCL to SCL pin
 // On UNO/Duemilanove/etc, SDA == Analog 4, SCL == Analog 5
@@ -73,15 +75,17 @@ Adafruit_CAP1188 cap = Adafruit_CAP1188();
 // CAP1188_MOSI, CAP1188_CS, CAP1188_RESET);
 
 void setup() {
-  Serial.begin(9600);
-  Serial.println("CAP1188 test!");
+  //Serial.println("CAP1188 test!");
 
   // Initialize the sensor, if using i2c you can pass in the i2c address
-  // if (!cap.begin(0x28)) {
-  if (!cap.begin()) {
+  
+  // do this before starting serial because it prints some
+  // debug stuff
+  bool cap_found = cap.begin();
+
+  Serial.begin(115200);
+  if (!cap_found) {
     Serial.println("CAP1188 not found");
-  } else {
-  Serial.println("CAP1188 found!");
   }
 
   delay(3000); // power-up safety delay
@@ -96,17 +100,32 @@ void setup() {
   currentBlending = LINEARBLEND;
 }
 
-void loop() {
+void handle_touches() {
+
   static uint8_t touched = 0;
   touched = cap.touched();
 
-  if (millis() % 100 == 0) {
-    // refresh every 100ms
+  if (touched) {
+  
+    for (uint8_t i=0; i<8; i++) {
+      bool pin_touched = (touched & (1 << i));
+
+
+      if (pin_touched && !touch_state[i]) {
+        // activation  
+        MsgPacketizer::send(Serial, message::TOUCH_EVENT, message::TOUCH_EVENT_t {i});
+        //MsgPacketizer::send(Serial, message::TOUCH_EVENT, message::TOUCH_EVENT_t {i});
+      }
+      if (!pin_touched && touch_state[i]) {
+        // de-activation  
+      }
+
+      touch_state[i] = pin_touched;
+    }
   }
 
   if (touched == 0) {
     // No touch detected
-    clear_leds();
     currentPalette = blackPalette;
 
   } else {
@@ -114,6 +133,9 @@ void loop() {
     currentPalette = PartyColors_p;
   }
 
+}
+
+void update_leds() {
   static uint8_t startIndex = 0;
   startIndex = startIndex + 3; /* motion speed */
   FillLEDsFromPaletteColors(startIndex);
@@ -121,6 +143,15 @@ void loop() {
   FastLED.show();
   FastLED.delay(1000 / UPDATES_PER_SECOND);
   ChangePalettePeriodically() ;
+}
+
+void loop() {
+static int loop = 0;
+  //Serial.print("Loop "); Serial.println(loop++);
+  handle_touches();
+  update_leds();
+  MsgPacketizer::update();
+  MsgPacketizer::parse();
 }
 
 void clear_leds() {
@@ -155,7 +186,7 @@ void ChangePalettePeriodically() {
   static uint8_t lastSecond = 99;
 
   if (lastSecond != secondHand) {
-    Serial.println("CHANGE PALETTE WOO\n");
+    //Serial.println("CHANGE PALETTE WOO\n");
     lastSecond = secondHand;
     if (secondHand == 0) {
       currentPalette = RainbowColors_p;
