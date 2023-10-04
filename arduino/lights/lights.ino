@@ -114,6 +114,8 @@ void handle_touches() {
       if (pin_touched && !touch_state[i]) {
         // activation  
         MsgPacketizer::send(Serial, message::TOUCH_EVENT, message::TOUCH_EVENT_t {i});
+        // pubsub seems unneccessary between two things, and receipts do not seem to work
+        // so it just aggressively retries forever
         //MsgPacketizer::send(Serial, message::TOUCH_EVENT, message::TOUCH_EVENT_t {i});
       }
       if (!pin_touched && touch_state[i]) {
