@@ -10,11 +10,12 @@ Test setup using a capacitive touch sensor;
         - Chosen since it was in stock, there are other alternatives. 
         - We can chain $i^2c$ devices so can connect many sensors to a single microcontroller.
 - And WS12813 addressable RGB LED strip, can be had from kmart, bunnings etc, 
-    with the controller desoldered. Can also buy elsewhere. 
+    with the controller desoldered but you have ot check the pins in the actual 
+    strip. Can also buy at electronics stores but seems more expensive maybe. 
     This model needs to be driven with 12vs with 5v logic, but there are options 
     that only need 5v and 3.3v logic 
     - https://randomnerdtutorials.com/guide-for-ws2812b-addressable-rgb-led-strip-with-arduino/
-    - ttps://www.sdiplight.com/what-is-ws2813-led-and-how-to-use-ws2813/
+    - https://www.sdiplight.com/what-is-ws2813-led-and-how-to-use-ws2813/
     - There is a limit on how many LEDs we can drive from a single board, but it 
       is proportional to the update rate somehow. They need to use an external,
       power source the limit is on the communication protocol the WS12813 chip uses. 
