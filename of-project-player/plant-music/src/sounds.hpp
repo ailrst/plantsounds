@@ -30,6 +30,8 @@ class player {
   player( std::unique_ptr<plantmusic::config> & config) : config(config) {}
 
   void play_sound(int id) {
+    // todo proper mapping
+    // volume control
     id = id % sounds.size();
     if (!sounds[id].isPlaying()) {
       sounds[id].play(); 
