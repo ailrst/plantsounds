@@ -1,5 +1,7 @@
 // clang-format off
 #include <memory>
+#include <chrono>
+#include <functional>
 #include "ofMain.h"
 #include "ofxMsgPacketizer.h"
 #include "config.hpp"
@@ -8,35 +10,75 @@
 // clang-format on 
 
 
-struct channel_FSM {
-    enum {
-        idle,
-        playing_sound,
-    } state;
-    // last touched time
-    // first touched time
-    // need event sound finished to send stop event
+namespace plantmusic {
+
+class sensor_manager {
+  struct sensor_info {
+    std::chrono::time_point<std::chrono::steady_clock> state_since {};
+    bool state;
+  };
+
+  std::vector<sensor_info> sensor_state {};
+  std::unordered_map<chan_id, bool> filtered_channel_state {};
+  const std::unique_ptr<plantmusic::config> & config;
+  public:
+
+  sensor_manager(std::unique_ptr<plantmusic::config> & config) : config(config) {
+    sensor_state.resize(config->sensor_channel_mapping.size());
+  }
+
+  auto get_now() {
+    return std::chrono::steady_clock::now();
+  }
+
+  void update_sensor(const touch_event &t) {
+    auto now = get_now();
+
+    for (int i = 0; i < t.size(); i++) {
+      if (sensor_state[i].state != t.is_active(i)) {
+        sensor_state[i].state_since = now;
+      }
+      sensor_state[i].state = t.is_active(i);
+    }
+  }
+
+  const std::unordered_map<chan_id, bool> &
+    get_playing_channels() {
+      for (const auto &[sensor, channel]: config->sensor_channel_mapping) {
+        /*
+         * Only change state of the channel if the time threshold has elapsed. 
+         */
+        auto threshold = sensor_state[sensor].state ? config->activation_threshold_ms : config->deactivation_threshold_ms;
+
+        auto time_delta = get_now() - sensor_state[sensor].state_since;
+        auto millis_delta = std::chrono::duration_cast<std::chrono::milliseconds>(time_delta).count();
+        if (millis_delta > threshold) {
+          filtered_channel_state[channel] = sensor_state[sensor].state;
+        }
+      }
+      return filtered_channel_state;
+    }
+
 };
 
-
+};
 class ofApp : public ofBaseApp {
 
+    std::unique_ptr<plantmusic::sensor_manager> sensors;
     std::unique_ptr<plantmusic::config> config;
     std::unique_ptr<plantmusic::player> player;
 
   ofSerial serial;
 
-  // {key_i : val_i, key_a : [i, f, s]}
-  const uint8_t send_index = 0x12;
-  const uint8_t recv_index = 0x34;
-
   std::stringstream echo_info;
   std::stringstream recv_info;
 
+
 public:
   void setup() {
-    config = std::make_unique<plantmusic::config>();
+    config = std::make_unique<plantmusic::config>(plantmusic::config::default_config());
     player = std::make_unique<plantmusic::player>(config);
+    sensors = std::make_unique<plantmusic::sensor_manager>(config);
 
     player->setup();
     ofSetVerticalSync(false);
@@ -54,8 +96,17 @@ public:
     });
 
     MsgPacketizer::subscribe(serial, message::TOUCH_EVENT, [&](const message::TOUCH_EVENT_t &n) {
-      player->play_sound(n.channel);
-      ofLog() << "TOUCH EVENT on channel " << std::dec << (int)n.channel; 
+
+        sensors->update_sensor(n);
+        static int x = 0;
+
+        for (int i = 0; i < 8; i++) {
+          if (n.is_active(i)) {
+            player->play_sound(i);
+            ofLog() << "touch event " << x++ << " on channel " << std::dec << i; 
+          }
+        }
+
     });
 
 
@@ -87,7 +138,15 @@ public:
     echo_info.str("");
     echo_info.clear();
 
-    // update publishing data
+    auto sens = sensors->get_playing_channels();
+    for (auto &[channel, active]: sens) {
+      if (active) {
+        player->play_sound(channel);
+      } else {
+        player->stop_sound(channel);
+      }
+
+    }
 
     // must be called
     MsgPacketizer::update();

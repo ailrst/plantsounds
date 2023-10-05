@@ -39,6 +39,7 @@ class player {
   }
 
   void stop_sound(int id) {
+    id = id % sounds.size();
     sounds[id].stop();
   }
 

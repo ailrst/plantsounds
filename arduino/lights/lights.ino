@@ -41,7 +41,7 @@ CRGB leds[NUM_LEDS];
 
 #define NUM_TOUCH_PINS 8
 
-char touch_state[NUM_TOUCH_PINS] = {}; // TODO: 7/8ths wasted space
+//char touch_state[NUM_TOUCH_PINS] = {}; // TODO: 7/8ths wasted space
 
 
 CRGBPalette16 currentPalette;
@@ -52,8 +52,6 @@ TBlendType currentBlending;
 extern CRGBPalette16 myRedWhiteBluePalette;
 extern const TProgmemPalette16 myRedWhiteBluePalette_p PROGMEM;
 
-// Reset Pin is used for I2C or SPI
-#define CAP1188_RESET 9
 
 
 // For I2C, connect SDA to your Arduino's SDA pin, SCL to SCL pin
@@ -63,6 +61,7 @@ extern const TProgmemPalette16 myRedWhiteBluePalette_p PROGMEM;
 
 // Use I2C, no reset pin!
 Adafruit_CAP1188 cap = Adafruit_CAP1188();
+message::TOUCH_EVENT_t touch_state {0};
 
 // Or...Use I2C, with reset pin
 // Adafruit_CAP1188 cap = Adafruit_CAP1188(CAP1188_RESET);
@@ -96,37 +95,18 @@ void setup() {
   fill_solid(currentPalette, 16, CRGB::Black);
   fill_solid(blackPalette, 16, CRGB::Black);
 
+  MsgPacketizer::publish(Serial, message::TOUCH_EVENT, touch_state)->setFrameRate(10);
+
+
   currentPalette = RainbowColors_p;
   currentBlending = LINEARBLEND;
 }
 
 void handle_touches() {
 
-  static uint8_t touched = 0;
-  touched = cap.touched();
+  touch_state.state = cap.touched();
 
-  if (touched) {
-  
-    for (uint8_t i=0; i<8; i++) {
-      bool pin_touched = (touched & (1 << i));
-
-
-      if (pin_touched && !touch_state[i]) {
-        // activation  
-        MsgPacketizer::send(Serial, message::TOUCH_EVENT, message::TOUCH_EVENT_t {i});
-        // pubsub seems unneccessary between two things, and receipts do not seem to work
-        // so it just aggressively retries forever
-        //MsgPacketizer::send(Serial, message::TOUCH_EVENT, message::TOUCH_EVENT_t {i});
-      }
-      if (!pin_touched && touch_state[i]) {
-        // de-activation  
-      }
-
-      touch_state[i] = pin_touched;
-    }
-  }
-
-  if (touched == 0) {
+  if (touch_state.state == 0) {
     // No touch detected
     currentPalette = blackPalette;
 
@@ -134,6 +114,31 @@ void handle_touches() {
 
     currentPalette = PartyColors_p;
   }
+
+  return;
+  // bye
+
+//  if (touched) {
+//  
+//    for (uint8_t i=0; i<8; i++) {
+//      bool pin_touched = (touched & (1 << i));
+//
+//
+//      if (pin_touched && !touch_state[i]) {
+//        // activation  
+//        MsgPacketizer::send(Serial, message::TOUCH_EVENT, message::TOUCH_EVENT_t {i});
+//        // pubsub seems unneccessary between two things, and receipts do not seem to work
+//        // so it just aggressively retries forever
+//        //MsgPacketizer::send(Serial, message::TOUCH_EVENT, message::TOUCH_EVENT_t {i});
+//      }
+//      if (!pin_touched && touch_state[i]) {
+//        // de-activation  
+//      }
+//
+//      touch_state[i] = pin_touched;
+//    }
+//  }
+//
 
 }
 

@@ -54,8 +54,18 @@ struct led {
 };
 
 struct touch_event {
-  chan_id channel;
-  MSGPACK_DEFINE(channel);
+  uint8_t state;
+  MSGPACK_DEFINE(state);
+
+
+  int size() const {
+    return 8;
+  }
+
+  bool is_active(uint8_t pin) const {
+    return (1 << pin) & state;
+  }
+
 };
 
 
