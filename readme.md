@@ -59,3 +59,26 @@ arduino:avr   1.8.6   .../.arduino15/packages/arduino/hardware/avr/1.8.6
     - Uses the openframeworks MsgPacketizer library which is distributed as a zipfile
       in its git repo (under `extra`) which needs to be imported.
 
+
+---
+
+Other sensing methods
+
+If integrated capacitive touch ICs don't work it may be possible to use other 
+systems for sensing that allow more manual calibration
+
+There are also methods which allow less binary input (ie. detecting different 
+types/amounts of touch), such as swept-frequency capacitive sensing "Touche"
+    - https://www.nime.org/proceedings/2014/nime2014_515.pdf
+    - https://fablab.ruc.dk/sensing-touch-with-arduino/
+    - https://github.com/damellis/ESP/wiki/%5BExample%5D-Touch%C3%A9-swept-frequency-capacitive-sensing
+
+- https://medium.com/@narner/talking-to-plants-touch%C3%A9-experiments-1087e1f04eb1
+- capsense library
+    - https://github.com/PaulStoffregen/CapacitiveSensor
+    - seems surprisingly easy?
+
+- A 555 touch sensing circuit
+
+- It may be possible to calibrate the PlantMusic circuit to work as a switch 
+  as well, e.g. increasing the threshold. 
