@@ -2,6 +2,7 @@
 #include <memory>
 #include <chrono>
 #include <functional>
+#include <fstream>
 #include "ofMain.h"
 #include "ofxMsgPacketizer.h"
 #include "config.hpp"
@@ -9,6 +10,7 @@
 #include "../../../model.hpp"
 // clang-format on 
 
+using json = nlohmann::json;
 
 namespace plantmusic {
 
@@ -73,14 +75,61 @@ class ofApp : public ofBaseApp {
   std::stringstream echo_info;
   std::stringstream recv_info;
 
+  std::filesystem::file_time_type last_config_modification {};
+  const std::string config_path = "data/config.json"; 
+
+
+  void check_load_config() {
+    std::ifstream f(config_path);
+    if (!f) {
+      return;
+    }
+
+    auto t = std::filesystem::directory_entry(config_path).last_write_time();
+    if (last_config_modification == t) {
+      return;
+    }
+
+    last_config_modification = t;
+      
+    json j;
+    f >> j;
+    plantmusic::config c = j;
+    config = std::make_unique<plantmusic::config>(c);
+
+    ofLog()<< "reloaded config.";
+  }
+
+  void write_back_config() {
+    std::ofstream o(config_path);
+    o << json(*config).dump(2) << std::endl;
+    last_config_modification = std::filesystem::directory_entry(config_path).last_write_time();
+  }
 
 public:
   void setup() {
-    config = std::make_unique<plantmusic::config>(plantmusic::config::default_config());
+
+  std::ifstream f(config_path);
+  config = std::make_unique<plantmusic::config>(plantmusic::config::default_config());
+  if (f) {
+    json j;
+    f >> j;
+    plantmusic::config c = j;
+    config = std::make_unique<plantmusic::config>(c);
+  } else {
+    write_back_config();
+  }
+
     player = std::make_unique<plantmusic::player>(config);
+
+
     sensors = std::make_unique<plantmusic::sensor_manager>(config);
 
     player->setup();
+
+    // update config
+    write_back_config();
+
     ofSetVerticalSync(false);
     ofSetFrameRate(120);
     ofSetBackgroundColor(0);
@@ -92,7 +141,7 @@ public:
 
     // handle updated data from arduino
     MsgPacketizer::subscribe(serial, message::ERROR, [&](const message::ERROR_t &n) {
-      ofLog()<< "message: error:" << n.message << std::endl;
+      ofLog()<< "message: error:" << n.message;
     });
 
     MsgPacketizer::subscribe(serial, message::TOUCH_EVENT, [&](const message::TOUCH_EVENT_t &n) {
@@ -133,6 +182,7 @@ public:
   }
 
   void update() {
+    check_load_config();
     recv_info.str("");
     recv_info.clear();
     echo_info.str("");
