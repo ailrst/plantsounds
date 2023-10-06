@@ -23,9 +23,9 @@ class player {
   typedef int sound_id;
 
 
-  std::vector<ofSoundPlayer> sounds {};
+  //std::vector<ofSoundPlayer> sounds {};
   std::unordered_map <chan_id, sound_id> channel_sound {};
-  std::unordered_map <std::string, sound_id> sound_names {};
+  std::unordered_map <std::string, ofSoundPlayer> sounds{};
   std::unique_ptr<plantmusic::config> & config;
   public:
 
@@ -35,26 +35,26 @@ class player {
     // todo proper mapping
     // volume control
 
-    channel = channel % sounds.size();
-    sounds[channel].play();
-    return;
-    ofLog() << "Play sound";
+
+    //channel = channel % sounds.size();
+    //if (!sounds[channel].isPlaying()) {
+    //  sounds[channel].play();
+    //}
+
     bool played = false;
     for (const auto& [chan, sound] : config->channel_sound_mapping) {
-      if (chan == channel) {
+      if (chan != channel) continue;
 
-        if (!sound_names.contains(sound)) {
-          ofLog(OF_LOG_ERROR) << "Missing sound id for known sound " << sound; 
-          continue;
-        }
+      if (!sounds.contains(sound)) {
+        ofLog(OF_LOG_ERROR) << "Missing sound id for known sound " << sound; 
+        continue;
+      }
 
-        auto sound_id = sound_names[sound];
-        sounds[sound_id].play(); 
-        if (!sounds[sound_id].isPlaying()) {
-          played = true;
-        } else {
-          ofLog() << "already playing " << sound << " id " << sound_id;
-        }
+      played = true;
+      if (!sounds[sound].isPlaying()) {
+        sounds[sound].play(); 
+      } else {
+        ofLog() << "already playing " << sound;
       }
     }
     if (!played) {
@@ -63,8 +63,18 @@ class player {
   }
 
   void stop_sound(chan_id channel) {
-    channel = channel % sounds.size();
-    sounds[channel].stop();
+
+    for (const auto& [chan, sound] : config->channel_sound_mapping) {
+      if (chan != channel) continue;
+
+      if (!sounds.contains(sound)) {
+        ofLog(OF_LOG_ERROR) << "Missing sound id for known sound " << sound; 
+        continue;
+      }
+
+      sounds[sound].stop();
+    }
+
   }
 
   void setup() {
@@ -75,28 +85,22 @@ class player {
       if (!dir_entry.is_regular_file()) {
         continue;
       }
-      ofSoundPlayer &soundPlayer  = sounds.emplace_back();
-      soundPlayer.play();
-      bool loaded_ok = soundPlayer.load(dir_entry.path().string());
-      if (!loaded_ok) {
+      auto sound_name = dir_entry.path().filename().string();
+      sounds[sound_name] = ofSoundPlayer();
+
+      ofSoundPlayer &soundPlayer  = sounds[sound_name];
+      soundPlayer.load(dir_entry.path().string());
+      if (!soundPlayer.isLoaded()) {
         ofLog(OF_LOG_WARNING) << "Failed to load file: " << dir_entry.path().string();
-        sounds.pop_back();
+        sounds.erase(sound_name);
         continue;
       }
 
-      auto sound_name = dir_entry.path().filename().string();
-      sound_names[sound_name] = sounds.size() - 1;
-
-      if (std::none_of(config->channel_sound_mapping.begin(),
-      config->channel_sound_mapping.end(), 
-      [sound_name](auto &e) -> bool {return e.second == sound_name;})) {
-        config->channel_sound_mapping.push_back({i++, sound_name}); 
-      }
     }
 
-    ofLog() << "Loaded " << sounds.size() << " sounds " << sound_names.size(); 
-    for (auto &s : sound_names) {
-        ofLog() << "Loaded  " << s.first; 
+    ofLog() << "Loaded " << sounds.size() << " sounds " << sounds.size(); 
+    for (const auto &[name, s] : sounds) {
+        ofLog() << "Loaded  " << name; 
     }
           
     // iterate directory
