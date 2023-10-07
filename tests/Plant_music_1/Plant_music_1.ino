@@ -106,9 +106,9 @@ void setup()
   button.interval(5);
   
   randomSeed(analogRead(0)); //seed for QY8 4 channel mode
-  Serial.begin(31250);  //initialize at MIDI rate
-  //Serial.begin(9600); //for debugging 
-  
+ // Serial.begin(31250);  //initialize at MIDI rate
+  Serial.begin(9600); //for debugging 
+  Serial.println("Hello");
   controlMessage.value = 0;  //begin CV at 0
   //MIDIpanic(); //dont panic, unless you are sure it is nessisary
   checkBattery(); // shut off lightshow if power is too low
@@ -617,12 +617,14 @@ void analyzeSample()
     delta = maxim - minim; 
     
     //**********perform change detection 
+    Serial.print(delta); Serial.print(", ");
     if (delta > (stdevi * threshold)){
       change = 1;
-    }
+      Serial.println("1");
+    } else {Serial.println("0");}
+
     //*********
-    
-    if(change){// set note and control vector
+    if(false && change){// set note and control vector
        int dur = 150+(map(delta%127,1,127,100,2500)); //length of note
        int ramp = 3 + (dur%100) ; //control slide rate, min 25 (or 3 ;)
        int notechannel = random(1,5); //gather a random channel for QY8 mode
