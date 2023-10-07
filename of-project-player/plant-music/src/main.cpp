@@ -1,8 +1,10 @@
 // clang-format off
 #include <memory>
+#include <tuple>
 #include <chrono>
 #include <functional>
 #include <fstream>
+#include <sstream>
 #include "ofMain.h"
 #include "ofxMsgPacketizer.h"
 #include "config.hpp"
@@ -42,6 +44,22 @@ class sensor_manager {
       }
       sensor_state[i].state = t.is_active(i);
     }
+
+  }
+
+  std::tuple<const std::string, const std::string> log_state() {
+    auto now = get_now();
+    std::stringstream sensor_log;
+    std::stringstream state_log;
+    sensor_log << std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+    state_log << std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+    for (int i = 0; i < sensor_state.size(); i++) {
+      sensor_log << ", " << sensor_state[i].state; 
+      state_log << ", " << filtered_channel_state[i]; 
+    }
+    ofLog() << "sensor: " << sensor_log.str();
+    ofLog() << "smooth: " << state_log.str();
+    return {sensor_log.str(), state_log.str()};
   }
 
   const std::unordered_map<chan_id, bool> &
@@ -96,6 +114,7 @@ class ofApp : public ofBaseApp {
     f >> j;
     plantmusic::config c = j;
     config = std::make_unique<plantmusic::config>(c);
+    player->reload_config();
 
     ofLog()<< "reloaded config.";
   }
@@ -147,12 +166,11 @@ public:
     MsgPacketizer::subscribe(serial, message::TOUCH_EVENT, [&](const message::TOUCH_EVENT_t &n) {
 
         sensors->update_sensor(n);
-        static int x = 0;
 
         for (int i = 0; i < 8; i++) {
           if (n.is_active(i)) {
             player->play_sound(i);
-            ofLog() << "touch event " << x++ << " on channel " << std::dec << i; 
+            //ofLog() << "touch event " << x++ << " on channel " << std::dec << i; 
           }
         }
 
@@ -205,9 +223,29 @@ public:
 
 
   void draw() {
-    ofDrawBitmapString("FPS : " + ofToString(ofGetFrameRate()), 20, 40);
+
+    std::string sens, smoothed;
+    std::tie (sens, smoothed) = sensors->log_state();
+
+    //ofDrawBitmapString("FPS : " + ofToString(ofGetFrameRate()), 20, 40);
     ofDrawBitmapString(recv_info.str(), 20, 80);
     ofDrawBitmapString(echo_info.str(), 20, 120);
+
+    ofDrawBitmapString(sens, 20, 150);
+    ofDrawBitmapString(smoothed, 20, 180);
+
+    int i = 180;
+    ofDrawBitmapString("Sounds playing: ", 20, (i += 30));
+    i += 10;
+    for (const auto&[chan, sound] : player->sounds_mapping) {
+      std::stringstream s;
+      if (sound.player.isPlaying()) {
+        s << "  channel " << chan << " " << sound.filename;
+        ofDrawBitmapString(s.str(), 20, (i += 15));
+      }
+
+    }
+
   }
 };
 
