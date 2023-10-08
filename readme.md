@@ -82,3 +82,32 @@ types/amounts of touch), such as swept-frequency capacitive sensing "Touche"
 
 - It may be possible to calibrate the PlantMusic circuit to work as a switch 
   as well, e.g. increasing the threshold. 
+
+ ---
+
+ Testing notes
+
+ - PlantMusic code seems to produce completley random output
+ - Adafruit CAP1888 did not work with a tree; did not activate
+    - grounding is a possible problem, we attached the gnd pin directly to ground, 
+    tried with a batter and connected to laptop. 
+        - (if you hold laptop and touch near the sensor it works)
+- CapSense library did not have a clear pattern interacting with the tree and touch
+    its non-obvious what threshold value to use; may be able to automatically 
+    derive
+    - grounding is also a problem
+    - very noisy output when actually connected to the tree 
+    - may be able to be improved
+
+![capsense-test-image](tests/capsense.png)
+
+Going forward;
+
+- It may be a better idea to hide a copper antenna behind the LED strip and sense 
+  when human hand is near the antenna; this gives us much better repeatabiliy. 
+  This should be possible with just capsense library and a resistor. 
+- Try more sensitive capacitive sensor systems; eg 555 sensor may be more reliable?
+- Try driven systems like Touche; but tree may already introduce too much background noise 
+
+    
+
