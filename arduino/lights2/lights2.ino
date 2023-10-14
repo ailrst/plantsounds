@@ -27,26 +27,57 @@
 
 //#include "model.hpp"
 
+#define MIDI_SERIAL_RATE 31250
 
-#define LED_PIN 5
+
+#define sound_expiry 9000
+
+#define LED_PIN 6
 #define NUM_LEDS 50 // TODO: this is a complete guess
 #define BRIGHTNESS 64
 #define LED_TYPE WS2812
 #define COLOR_ORDER GRB
-CRGB leds[NUM_LEDS];
 
-// MsgPacketizer
-#define MAX_CHANNELS 100
+#define BUTTON_THRESHOLD 200
 
-#define UPDATES_PER_SECOND 100
-// ---------------
+// led
+#define UPDATES_PER_SECOND 10
 
-#define NUM_TOUCH_PINS 8
+
+#define NUM_TOUCH_PINS 1
+
+void FillLEDsFromPaletteColors() ;
+
+typedef struct _MIDImessage { //build structure for Note and Control MIDImessages
+  unsigned int type;
+  int value;
+  int velocity;
+  long duration;
+  long period;
+  int channel;
+} 
+MIDImessage;
+MIDImessage noteArray[NUM_TOUCH_PINS]; 
+MIDImessage controlMessage; 
+
+void midiSerial(int type, int channel, int number, int velocity);
+
 
 //char touch_state[NUM_TOUCH_PINS] = {}; // TODO: 7/8ths wasted space
 
-byte button_pins[NUM_TOUCH_PINS] = {1,2,3,4,5,6,7,8};
+byte button_pins[NUM_TOUCH_PINS] = {3};
 Bounce buttons[NUM_TOUCH_PINS];
+byte button_led_mapping[NUM_TOUCH_PINS] = {0};
+
+#define num_led_segments 1
+byte num_leds_in_segment[num_led_segments] = {NUM_LEDS};
+byte led_segment_motion_index[num_led_segments] = {};
+byte led_segment_begin[num_led_segments] = {};
+CRGB leds[NUM_LEDS];
+
+CRGBPalette16 led_palettes[num_led_segments] = {};
+
+
 
 CRGBPalette16 currentPalette;
 CRGBPalette16 blackPalette;
@@ -65,7 +96,7 @@ extern const TProgmemPalette16 myRedWhiteBluePalette_p PROGMEM;
 
 // Use I2C, no reset pin!
 Adafruit_CAP1188 cap = Adafruit_CAP1188();
-message::TOUCH_EVENT_t touch_state {0};
+//message::TOUCH_EVENT_t touch_state {0};
 
 // Or...Use I2C, with reset pin
 // Adafruit_CAP1188 cap = Adafruit_CAP1188(CAP1188_RESET);
@@ -82,25 +113,35 @@ void setup() {
 
   // Initialize the sensor, if using i2c you can pass in the i2c address
   
-  // do this before starting serial because it prints some
-  // debug stuff
-  bool cap_found = cap.begin();
 
-  Serial.begin(115200);
-  if (!cap_found) {
-    Serial.println("CAP1188 not found");
+
+  //Serial.begin(9600);
+  Serial.begin(MIDI_SERIAL_RATE);
+
+  for (int i = 0; i < NUM_TOUCH_PINS; i++) {
+    buttons[i].attach(button_pins[i], INPUT_PULLUP);
+    buttons[i].interval(25);
   }
 
   delay(3000); // power-up safety delay
-  FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS)
-      .setCorrection(TypicalLEDStrip);
+
+  int running_led_offset = 0;
+
+  FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, 
+      NUM_LEDS).setCorrection(TypicalLEDStrip);
+
+
   FastLED.setBrightness(BRIGHTNESS);
+
 
   fill_solid(currentPalette, 16, CRGB::Black);
   fill_solid(blackPalette, 16, CRGB::Black);
 
-  MsgPacketizer::publish(Serial, message::TOUCH_EVENT, touch_state)->setFrameRate(10);
+  for (int i = 0; i < num_led_segments; i++) {
+    led_palettes[i] = blackPalette;
+  }
 
+  //MsgPacketizer::publish(Serial, message::TOUCH_EVENT, touch_state)->setFrameRate(10);
 
   currentPalette = RainbowColors_p;
   currentBlending = LINEARBLEND;
@@ -108,61 +149,73 @@ void setup() {
 
 void handle_touches() {
 
-  touch_state.state = cap.touched();
+  static long became_on = millis();
+  static bool state = false;
 
-  if (touch_state.state == 0) {
-    // No touch detected
-    currentPalette = blackPalette;
+  for (int i = 0; i < NUM_TOUCH_PINS; i++) {
+    buttons[i].update();
 
-  } else {
+    if (buttons[i].fell()) {
+        state = true;
+        midiSerial(144, i, 440, 255); 
+        became_on = millis();
+        int led = button_led_mapping[i]; 
+        led_palettes[led] = PartyColors_p;
+        currentPalette = PartyColors_p;
+    } 
 
-    currentPalette = PartyColors_p;
+    if (buttons[i].rose()) {
+        state = false;
+        midiSerial(144, i, 440, 0); 
+        int led = button_led_mapping[i]; 
+        currentPalette = blackPalette;
+    }
+
+    if (state && (millis()  - became_on) > sound_expiry) {
+      // stop  at end of note
+      midiSerial(144, i, 440, 0); 
+      state = false;
+      int led = button_led_mapping[i]; 
+      led_palettes[led] = blackPalette;
+      currentPalette = blackPalette;
+    }
+
+
   }
-
-  return;
-  // bye
-
-//  if (touched) {
-//  
-//    for (uint8_t i=0; i<8; i++) {
-//      bool pin_touched = (touched & (1 << i));
-//
-//
-//      if (pin_touched && !touch_state[i]) {
-//        // activation  
-//        MsgPacketizer::send(Serial, message::TOUCH_EVENT, message::TOUCH_EVENT_t {i});
-//        // pubsub seems unneccessary between two things, and receipts do not seem to work
-//        // so it just aggressively retries forever
-//        //MsgPacketizer::send(Serial, message::TOUCH_EVENT, message::TOUCH_EVENT_t {i});
-//      }
-//      if (!pin_touched && touch_state[i]) {
-//        // de-activation  
-//      }
-//
-//      touch_state[i] = pin_touched;
-//    }
-//  }
-//
-
+    FillLEDsFromPaletteColors();
 }
 
-void update_leds() {
-  static uint8_t startIndex = 0;
-  startIndex = startIndex + 3; /* motion speed */
-  FillLEDsFromPaletteColors(startIndex);
 
+void midiSerial(int type, int channel, int number, int velocity) {
+
+    //  Note type = 144
+    //  Control type = 176  
+    // remove MSBs on data
+    number &= 0x7F;  //number
+    velocity &= 0x7F;  //velocity
+    
+    byte statusbyte = (type | ((channel-1) & 0x0F));
+    
+    Serial.write(statusbyte);
+    Serial.write(number);
+    Serial.write(velocity);
+  sei(); //enable interrupts
+}
+
+
+void update_leds() {
+
+  FillLEDsFromPaletteColors();
   FastLED.show();
   FastLED.delay(1000 / UPDATES_PER_SECOND);
-  ChangePalettePeriodically() ;
 }
 
 void loop() {
-static int loop = 0;
   //Serial.print("Loop "); Serial.println(loop++);
   handle_touches();
   update_leds();
-  MsgPacketizer::update();
-  MsgPacketizer::parse();
+  //MsgPacketizer::update();
+  //MsgPacketizer::parse();
 }
 
 void clear_leds() {
@@ -173,8 +226,24 @@ void clear_leds() {
   }
 }
 
-void FillLEDsFromPaletteColors(uint8_t colorIndex) {
+
+void FillLEDsFromPaletteColors(
+CRGB *begin, CRGB*end, 
+CRGBPalette16  &palette,
+uint8_t colorIndex) {
   uint8_t brightness = 255;
+
+  for (CRGB* led = begin; led != end+1; led++) {
+    *led = ColorFromPalette(palette, colorIndex, brightness,
+                               currentBlending);
+    colorIndex += 3;
+  }
+}
+
+void FillLEDsFromPaletteColors() {
+  uint8_t brightness = 255;
+  static int colorIndex = 0;
+  colorIndex += 1;
 
   for (int i = 0; i < NUM_LEDS; ++i) {
     leds[i] = ColorFromPalette(currentPalette, colorIndex, brightness,
