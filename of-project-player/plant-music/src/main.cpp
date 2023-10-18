@@ -1,4 +1,5 @@
 // clang-format off
+#include "cxxopts.hpp"
 #include <memory>
 #include <tuple>
 #include <chrono>
@@ -125,7 +126,12 @@ class ofApp : public ofBaseApp {
     last_config_modification = std::filesystem::directory_entry(config_path).last_write_time();
   }
 
+  std::string serial_port;
 public:
+
+  ofApp(std::string port) : serial_port(port) {
+  }
+
   void setup() {
 
   std::ifstream f(config_path);
@@ -153,7 +159,7 @@ public:
     ofSetFrameRate(120);
     ofSetBackgroundColor(0);
 
-    serial.setup("/dev/ttyUSB0", 115200);
+    serial.setup(serial_port, 115200);
 
     // publish packet (you can also send function returns)
     //MsgPacketizer::publish(serial, send_index, nested)->setFrameRate(60);
@@ -249,8 +255,19 @@ public:
   }
 };
 
-int main() {
+int main(int argc, char **argv) {
+
+    cxxopts::Options options("plant-music", "Sound player");
+
+    options.add_options()
+        ("p,port", "Ardino serial port", cxxopts::value<std::string>()->default_value("/dev/ttyUSB0"))
+        ;
+
+
+
+    auto result = options.parse(argc, argv);
+    auto port = result["port"].as<std::string>();
 
   ofSetupOpenGL(480, 360, OF_WINDOW);
-  ofRunApp(new ofApp());
+  ofRunApp(new ofApp(port));
 }
