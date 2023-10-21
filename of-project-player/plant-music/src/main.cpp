@@ -11,6 +11,7 @@
 #include "config.hpp"
 #include "sounds.hpp"
 #include "../../../model.hpp"
+#include "waveform-generator.hpp"
 // clang-format on 
 
 using json = nlohmann::json;

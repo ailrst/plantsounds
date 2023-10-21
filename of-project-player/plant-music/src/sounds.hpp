@@ -11,6 +11,8 @@
 #include <memory>
 #include "ofMain.h"
 #include "config.hpp"
+#include <optional>
+#include "waveform-generator.hpp"
 #include "../../../model.hpp"
 // clang-format on 
 
@@ -21,6 +23,7 @@ namespace plantmusic {
     ofSoundPlayer player;
     std::string filename;
     chan_id channel;
+    std::optional<light_sequence> lights {};
   };
 
 class player {
@@ -70,6 +73,19 @@ class player {
       };
       sounds_mapping[chan].player.load((std::filesystem::path(config->sounds_path) / sound).string());
 
+      std::stringstream pattern_path;
+      pattern_path << sound.substr(0, sound.rfind(".")) << ".json";
+
+    auto full_pattern_path = (std::filesystem::path(config->sounds_path) / pattern_path.str());
+      if (std::filesystem::exists(full_pattern_path)) {
+        sounds_mapping[chan].lights = light_sequence::load(full_pattern_path.string());
+        ofLog() << "Loaded light pattern for " << sound << " (" << pattern_path.str() << ")";
+      } else {
+        ofLog() << "No light pattern for " << sound<< " (" << pattern_path.str() << ")";
+      }
+
+
+
       if (!sounds_mapping[chan].player.isLoaded()) {
         ofLog(OF_LOG_WARNING) << "Failed to load file: " << sound;
         sounds_mapping.erase(chan);
@@ -95,8 +111,6 @@ class player {
     for (const auto &player: sounds_mapping) {
         ofLog() << "Loaded  " << player.second.filename << " on chan " << (int)player.second.channel ; 
     }
-
-
           
     // iterate directory
   }
