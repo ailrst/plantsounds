@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+namespace plantsounds {
 struct light_sequence {
   std::string filename;
   int numbins;
@@ -45,28 +46,34 @@ struct light_sequence {
     return s;
   }
 
-  const std::reference_wrapper<std::vector<uint8_t>>
-  get_keyframe_for_time(float timepoint_seconds) {
-    return keyframes.lower_bound((int)(1000 * timepoint_seconds))->second;
+  const std::vector<uint8_t> &
+  get_keyframe_for_time_millis(int timepoint_millis) const {
+    auto res = keyframes.upper_bound((int)(1000 * timepoint_millis));
+    if (res == keyframes.end()) {
+      return keyframes.begin()->second;
+    } else {
+      return res->second;
+    }
   }
 
-  void write_keyframe_for_timepoint(float timepoint_seconds,
-                                    std::vector<uint8_t> &out) {
-    const std::reference_wrapper<std::vector<uint8_t>> kf =
-        get_keyframe_for_time(timepoint_seconds);
+  void write_keyframe_for_timepoint_millis(int timepoint_millis,
+                                           std::vector<uint8_t> &out) {
+    const std::vector<uint8_t> &kf =
+        get_keyframe_for_time_millis(timepoint_millis);
 
-    int end = kf.get().size() > out.size() ? out.size() : kf.get().size();
+    int end = kf.size() > out.size() ? out.size() : kf.size();
 
     for (int i = 0; i < end; i++) {
-      out[i] = kf.get()[i];
+      out[i] = kf[i];
     }
 
-    if (out.size() > kf.get().size()) {
+    if (out.size() > kf.size()) {
       // clamp
-      for (int i = kf.get().size(); i < out.size(); i++) {
-        out[i] = kf.get()[kf.get().size() - 1];
+      for (int i = kf.size(); i < out.size(); i++) {
+        out[i] = kf[kf.size() - 1];
       }
     }
     // else truncate
   }
 };
+}; // namespace plantsounds

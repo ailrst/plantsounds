@@ -11,6 +11,7 @@
 #include "config.hpp"
 #include "sounds.hpp"
 #include "../../../model.hpp"
+#include "visualiser.hpp"
 #include "waveform-generator.hpp"
 // clang-format on 
 
@@ -89,6 +90,7 @@ class ofApp : public ofBaseApp {
     std::unique_ptr<plantmusic::sensor_manager> sensors;
     std::unique_ptr<plantmusic::config> config;
     std::unique_ptr<plantmusic::player> player;
+    std::vector<std::unique_ptr<plantmusic::visualiser>> visualisers{};
 
   ofSerial serial;
 
@@ -153,6 +155,18 @@ public:
 
     player->setup();
 
+    for (const auto &[chan, snd]: player->sounds_mapping) {
+      auto s = plantmusic::visualiser::create(serial, chan, snd);
+      if (s) {
+        visualisers.push_back(std::move(s));
+
+         //MsgPacketizer::publish(serial, message::LIGHTING_UPDATE, visualisers.back()->brightness)
+         //  ->setFrameRate(10);
+
+      }
+    }
+
+
     // update config
     write_back_config();
 
@@ -208,11 +222,13 @@ public:
 
   void update() {
     check_load_config();
+    ofLog() << "update()";
     recv_info.str("");
     recv_info.clear();
     echo_info.str("");
     echo_info.clear();
 
+    // process sensor input  and play sounds as neccessary
     auto sens = sensors->get_playing_channels();
     for (auto &[channel, active]: sens) {
       if (active) {
@@ -223,9 +239,16 @@ public:
 
     }
 
-    // must be called
-    MsgPacketizer::update();
+    // send visualisation based on playing sounds
+    for (auto &vis: visualisers) {
+      vis->update();
+    }
+
+
+
+    // must be called to process serial messages
     MsgPacketizer::parse();
+    MsgPacketizer::update();
   }
 
 
@@ -254,6 +277,10 @@ public:
     }
 
   }
+
+
+  
+
 };
 
 int main(int argc, char **argv) {

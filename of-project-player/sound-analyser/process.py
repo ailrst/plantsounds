@@ -106,10 +106,10 @@ with open(filename.replace(".wav", ".json"), "w") as f:
 if args.plot:
     fig, ax = plt.subplots()
 
-    (plot,) = ax.plot([0 for i in range(num_bins - 1)] + [200])
+    (plot,) = ax.plot([0 for i in range(num_bins - 1)] + [255])
     ani = animation.FuncAnimation(
         fig, loader.prepare_animation(plot), 50000, interval=1000 * fps
     )
-    subprocess.Popen(f"aplay {filename}", shell=True)
+    subprocess.Popen(f'aplay "{filename}"', shell=True)
 
     plt.show()

@@ -19,12 +19,12 @@
 
 namespace plantmusic {
 
-  struct sound {
-    ofSoundPlayer player;
-    std::string filename;
-    chan_id channel;
-    std::optional<light_sequence> lights {};
-  };
+struct sound {
+  ofSoundPlayer player;
+  std::string filename;
+  chan_id channel;
+  std::optional<plantsounds::light_sequence> lights {};
+};
 
 class player {
 
@@ -78,8 +78,9 @@ class player {
 
     auto full_pattern_path = (std::filesystem::path(config->sounds_path) / pattern_path.str());
       if (std::filesystem::exists(full_pattern_path)) {
-        sounds_mapping[chan].lights = light_sequence::load(full_pattern_path.string());
-        ofLog() << "Loaded light pattern for " << sound << " (" << pattern_path.str() << ")";
+        sounds_mapping[chan].lights = plantsounds::light_sequence::load(full_pattern_path.string());
+        ofLog() << "Loaded light pattern for " << sound << " (" << pattern_path.str() << ") " 
+          << sounds_mapping[chan].lights->frames.size() << "x" << sounds_mapping[chan].lights->get_keyframe_for_time_millis(0).size();
       } else {
         ofLog() << "No light pattern for " << sound<< " (" << pattern_path.str() << ")";
       }
