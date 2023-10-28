@@ -180,30 +180,31 @@ public:
     //MsgPacketizer::publish(serial, send_index, nested)->setFrameRate(60);
 
     // handle updated data from arduino
-    MsgPacketizer::subscribe(serial, message::ERROR, [&](const message::ERROR_t &n) {
-      ofLog()<< "message: error:" << n.message;
-    });
 
-    MsgPacketizer::subscribe(serial, message::TOUCH_EVENT, [&](const message::TOUCH_EVENT_t &n) {
+    Packetizer::subscribe(serial, message::TOUCH_EVENT, 
+                [&](const uint8_t* data, const size_t size) {
 
-        sensors->update_sensor(n);
+      const message::TOUCH_EVENT_t * const ev = 
+        reinterpret_cast<const message::TOUCH_EVENT_t *>(data);
 
-        for (int i = 0; i < 8; i++) {
-          if (n.is_active(i)) {
-            player->play_sound(i);
-            //ofLog() << "touch event " << x++ << " on channel " << std::dec << i; 
-          }
+
+      sensors->update_sensor(*ev);
+      for (int i = 0; i < 8; i++) {
+        if (ev->is_active(i)) {
+          player->play_sound(i);
+          //ofLog() << "touch event " << x++ << " on channel " << std::dec << i; 
         }
+      }
 
     });
 
 
     // always called if packet has come regardless of index
-    MsgPacketizer::subscribe(serial, [&](const uint8_t index,
-                                         MsgPack::Unpacker &unpacker) {
-      recv_info << "packet has come! index = 0x" << std::hex << (int)index;
-      recv_info << ", arg size = " << std::dec << unpacker.size() << std::endl;
-    });
+    //Packetizer::subscribe(serial, [&](const uint8_t index,
+    //                                     MsgPack::Unpacker &unpacker) {
+    //  recv_info << "packet has come! index = 0x" << std::hex << (int)index;
+    //  recv_info << ", arg size = " << std::dec << unpacker.size() << std::endl;
+    //});
   }
 
 
@@ -245,10 +246,10 @@ public:
     }
 
 
-
     // must be called to process serial messages
-    MsgPacketizer::parse();
-    MsgPacketizer::update();
+    Packetizer::parse();
+    //Packetizer::update();
+    serial.flush();
   }
 
 

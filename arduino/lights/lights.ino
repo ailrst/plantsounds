@@ -17,14 +17,24 @@
 
 #include <Adafruit_CAP1188.h>
 
+#define PACKETIZER_USE_INDEX_AS_DEFAULT
+#define PACKETIZER_USE_CRC_AS_DEFAULT
+// max number of decoded packet queues
+#define PACKETIZER_MAX_PACKET_QUEUE_SIZE 1
+// max data bytes in packet
+#define PACKETIZER_MAX_PACKET_BINARY_SIZE 128
+// max number of callback for one stream
+#define PACKETIZER_MAX_CALLBACK_QUEUE_SIZE 4
+// max number of streams
+#define PACKETIZER_MAX_STREAM_MAP_SIZE 2
 
-#include <MsgPacketizer.h>
+#include <Packetizer.h>
 
 #include <FastLED.h>
 
 #include "model.hpp"
 
-#define NUM_LEDS 70 // TODO: this is a complete guess
+#define NUM_LEDS 30 // TODO: this is a complete guess
 #define LED_PIN 5
 #define BRIGHTNESS 64
 #define LED_TYPE WS2812
@@ -50,7 +60,6 @@ Needs at least 700bytes for local variables for it to function.
 #define NUM_TOUCH_PINS 8
 
 //char touch_state[NUM_TOUCH_PINS] = {}; // TODO: 7/8ths wasted space
-message::LED_UPDATE_t led_update;
 
 CRGBPalette16 currentPalette;
 
@@ -73,9 +82,18 @@ message::TOUCH_EVENT_t touch_state {0};
 // Adafruit_CAP1188 cap = Adafruit_CAP1188(CAP1188_CLK, CAP1188_MISO,
 // CAP1188_MOSI, CAP1188_CS, CAP1188_RESET);
 
+const uint8_t lighting_index = message::LIGHTING_UPDATE;
 const uint8_t led_index = message::LED_UPDATE;
 const uint8_t touch_index = message::TOUCH_EVENT;
 const uint8_t error_index = message::ERROR;
+
+auto callback = 
+        [&](const uint8_t* data, const size_t size) {
+  
+        fill_solid(currentPalette, 16, CRGB::Blue);
+        return;
+
+        };
 
 void setup() {
   //Serial.println("CAP1188 test!");
@@ -101,22 +119,28 @@ void setup() {
   fill_solid(currentPalette, 16, CRGB::Red);
 
 
+    Packetizer::subscribe(Serial, 0x500, callback);
+
  // MsgPacketizer::subscribe(Serial, lighting_index, brightnesses);
-//  MsgPacketizer::subscribe(Serial, led_index, 
+//  Packetizer::subscribe(Serial, led_index, 
  //   led_update);
   //      fill_solid(currentPalette, 16, CRGB::Blue);
   //    MsgPacketizer::send(Serial, error_index, message::ERROR_t {"Got message"});
 
-  MsgPacketizer::publish(Serial, touch_index, touch_state)->setFrameRate(3);
 
 
 
 }
 
 void handle_touches() {
-
+  uint8_t oldstate = touch_state.state;
   touch_state.state = cap.touched();
+
+  if (oldstate != touch_state.state) {
+    Packetizer::send(Serial, touch_index, reinterpret_cast<const uint8_t *>(&touch_state), sizeof(touch_state));
+  }
  
+ return;
 
   if (touch_state.state) {
     fill_solid(currentPalette, 16, CRGB::White);
@@ -145,11 +169,10 @@ void loop() {
 
   //fill_solid(currentPalette, 16, CRGB::Blue);
   handle_touches();
+  Packetizer::parse();
 
   update_leds();
 
-  MsgPacketizer::parse();
-  MsgPacketizer::update();
 }
 
 void FillLEDsFromPaletteColors(uint8_t colorIndex) {

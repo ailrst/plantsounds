@@ -7,7 +7,7 @@
 #include <optional>
 #include <type_traits>
 
-const uint8_t led_update_index = 0x64;
+const uint8_t led_update_index = message::LIGHTING_UPDATE;
 
 namespace plantmusic {
 class visualiser {
@@ -18,14 +18,13 @@ private:
   ofSerial &serial;
 
 public:
-  message::LIGHTING_UPDATE_t brightness{0, {}};
+  message::LIGHTING_UPDATE_t brightness{};
   visualiser(visualiser &v) = delete;
   visualiser(const visualiser &v) = delete;
 
   visualiser(ofSerial &serial, const chan_id channel, const sound &sound)
       : snd(sound), serial(serial) {
     brightness.channel = channel;
-    brightness.lights = {};
 
     if (!snd.lights) {
       ofLog(OF_LOG_WARNING) << "Sound '" << sound.filename
@@ -50,11 +49,10 @@ public:
     }
 
     if (!snd.player.isPlaying()) {
-      ofLog() << "sound not playing";
+      // ofLog() << "sound not playing";
       return;
     }
 
-    ofLog() << "Get keyframe";
     auto new_val =
         snd.lights->get_keyframe_for_time_millis(snd.player.getPositionMS());
 
@@ -66,14 +64,19 @@ public:
     // brightness.lights.resize(new_val.size());
 
     if (&new_val != brightness_val) {
+      ofLog() << "New keyframe";
+      int num = MAXNUM_LEDS > new_val.size() ? new_val.size() : MAXNUM_LEDS;
       brightness_val = &new_val;
       // began new keyframe
-      this->brightness.lights.resize(new_val.size());
-      for (int i = 0; i < new_val.size(); i++) {
-        // this->brightness.lights[i] = new_val[i];
+      this->brightness.num_leds = num;
+      for (int i = 0; i < num; i++) {
+        this->brightness.lights[i] = new_val[i];
       }
-      ofLog() << "Send update\n";
-      MsgPacketizer::send(serial, led_update_index, message::LED_UPDATE_t(100));
+      Packetizer::send(serial, led_update_index,
+                       reinterpret_cast<const uint8_t *>(&this->brightness),
+                       sizeof(this->brightness));
+      ofLog() << "Send update " << this->brightness.num_leds << " leds "
+              << sizeof(this->brightness) << " bytes\n";
 
       // MsgPacketizer::send(serial, message::LIGHTING_UPDATE, brightness);
     }
