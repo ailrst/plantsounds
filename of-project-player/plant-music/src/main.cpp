@@ -39,6 +39,9 @@ class sensor_manager {
   }
 
   void update_sensor(const touch_event &t) {
+
+
+
     auto now = get_now();
 
     for (int i = 0; i < t.size(); i++) {
@@ -181,22 +184,22 @@ public:
 
     // handle updated data from arduino
 
-    Packetizer::subscribe(serial, message::TOUCH_EVENT, 
-                [&](const uint8_t* data, const size_t size) {
+    //Packetizer::subscribe(serial, message::TOUCH_EVENT, 
+    //            [&](const uint8_t* data, const size_t size) {
 
-      const message::TOUCH_EVENT_t * const ev = 
-        reinterpret_cast<const message::TOUCH_EVENT_t *>(data);
+    //  const message::TOUCH_EVENT_t * const ev = 
+    //    reinterpret_cast<const message::TOUCH_EVENT_t *>(data);
 
 
-      sensors->update_sensor(*ev);
-      for (int i = 0; i < 8; i++) {
-        if (ev->is_active(i)) {
-          player->play_sound(i);
-          //ofLog() << "touch event " << x++ << " on channel " << std::dec << i; 
-        }
-      }
+    //  sensors->update_sensor(*ev);
+    //  for (int i = 0; i < 8; i++) {
+    //    if (ev->is_active(i)) {
+    //      player->play_sound(i);
+    //      //ofLog() << "touch event " << x++ << " on channel " << std::dec << i; 
+    //    }
+    //  }
 
-    });
+    //});
 
 
     // always called if packet has come regardless of index
@@ -229,6 +232,11 @@ public:
     echo_info.str("");
     echo_info.clear();
 
+    int res = 0;
+    while ((res = serial.readByte()) != OF_SERIAL_NO_DATA && res != OF_SERIAL_ERROR ) {
+      sensors->update_sensor({.state = (uint8_t)res});
+    }
+
     // process sensor input  and play sounds as neccessary
     auto sens = sensors->get_playing_channels();
     for (auto &[channel, active]: sens) {
@@ -247,9 +255,8 @@ public:
 
 
     // must be called to process serial messages
-    Packetizer::parse();
+  //  Packetizer::parse();
     //Packetizer::update();
-    serial.flush();
   }
 
 
